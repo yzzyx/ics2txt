@@ -38,15 +38,16 @@ func main() {
 		return
 	}
 
+	tz := getTimeZone(calendar)
 	for _, ev := range calendar.Events() {
 		PrintIndentedString(ev.Props, ical.PropSummary, "    Summary:")
 
-		if startdate, err := ev.DateTimeStart(time.Local); err == nil {
-			fmt.Println("      Start:", startdate)
+		if startdate, err := ev.DateTimeStart(tz); err == nil {
+			fmt.Println("      Start:", startdate.In(time.Local))
 
 		}
-		if enddate, err := ev.DateTimeEnd(time.Local); err == nil {
-			fmt.Println("        End:", enddate)
+		if enddate, err := ev.DateTimeEnd(tz); err == nil {
+			fmt.Println("        End:", enddate.In(time.Local))
 		}
 
 		PrintPersonInfo(ev.Props, ical.PropOrganizer, "  Organizer:")
@@ -54,6 +55,35 @@ func main() {
 		PrintIndentedString(ev.Props, ical.PropLocation, "   Location:")
 		PrintIndentedString(ev.Props, ical.PropDescription, "Description:")
 	}
+}
+
+func getTimeZone(calendar *ical.Calendar) *time.Location {
+	timezoneProps := []string{
+		ical.PropTimezoneID,
+		ical.PropTimezoneName,
+	}
+
+	for _, child := range calendar.Children {
+		if child.Name != ical.CompTimezone {
+			continue
+		}
+
+		for _, timezoneProp := range timezoneProps {
+			id, ok := child.Props[timezoneProp]
+			if !ok {
+				continue
+			}
+
+			for _, p := range id {
+				loc, err := time.LoadLocation(p.Value)
+				if err == nil {
+					return loc
+				}
+			}
+		}
+	}
+
+	return time.Local
 }
 
 func PrintPersonInfo(props ical.Props, propName string, displayName string) {
